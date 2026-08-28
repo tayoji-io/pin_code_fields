@@ -1,3 +1,10 @@
+## 9.4.0+1
+
+ - **FIX**: paste toolbar was invisible and untappable, silently disabling `enablePaste`.
+   The invisible `EditableText` was wrapped in `Opacity(opacity: 0)`; `RenderOpacity`
+   skips painting its child at alpha 0, so the selection overlay's `LayerLink` never
+   got a leader. Invisibility now comes from the transparent colors alone.
+
 ## 9.4.0
 
  - **FIX**: suppress semantic hint and focused state when disabled (#427).

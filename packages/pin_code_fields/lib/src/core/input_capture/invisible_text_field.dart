@@ -88,48 +88,53 @@ class InvisibleTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use EditableText for core functionality with autofill support
-    // Note: We use fontSize: 1 and Opacity instead of fontSize: 0.1
-    // because web browsers need a properly sized text field to handle input
-    return Opacity(
-      opacity: 0,
-      child: EditableText(
-        key: editableTextKey,
-        controller: controller,
-        focusNode: focusNode,
-        readOnly: readOnly,
-        // Invisible but properly sized for web compatibility
-        style: const TextStyle(
-          color: Colors.transparent,
-          fontSize: 1,
-        ),
-        cursorColor: Colors.transparent,
-        backgroundCursorColor: Colors.transparent,
-        selectionColor: Colors.transparent,
-        showCursor: false,
-        showSelectionHandles: false,
-        enableInteractiveSelection: selectionEnabled,
-        selectionControls: selectionEnabled ? selectionControls : null,
-        contextMenuBuilder: selectionEnabled ? contextMenuBuilder : null,
-        // Input configuration
-        keyboardType: keyboardType,
-        inputFormatters: _buildInputFormatters(),
-        autofocus: false, // Handled externally
-        autocorrect: false,
-        enableSuggestions: false,
-        textCapitalization: textCapitalization,
-        textInputAction: textInputAction,
-        onSubmitted: onSubmitted,
-        onEditingComplete: onEditingComplete,
-        onSelectionChanged: onSelectionChanged,
-        keyboardAppearance: keyboardAppearance ?? Theme.of(context).brightness,
-        scrollPadding: scrollPadding,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        clipBehavior: Clip.none,
-        // Autofill support
-        autofillHints: autofillHints,
+    // Use EditableText for core functionality with autofill support.
+    //
+    // Invisibility comes from the transparent colors below, NOT from an
+    // Opacity wrapper: `RenderOpacity` skips painting its child entirely at
+    // alpha 0, so the `LayerLink` that `EditableText` publishes for the
+    // selection overlay never gets a leader. The paste toolbar then resolves
+    // to an unlinked `CompositedTransformFollower` — invisible and untappable,
+    // which silently disables `enablePaste`. Keep this subtree painting.
+    //
+    // fontSize is 1 rather than 0.1 because web browsers need a properly
+    // sized text field to handle input.
+    return EditableText(
+      key: editableTextKey,
+      controller: controller,
+      focusNode: focusNode,
+      readOnly: readOnly,
+      // Invisible but properly sized for web compatibility
+      style: const TextStyle(
+        color: Colors.transparent,
+        fontSize: 1,
       ),
+      cursorColor: Colors.transparent,
+      backgroundCursorColor: Colors.transparent,
+      selectionColor: Colors.transparent,
+      showCursor: false,
+      showSelectionHandles: false,
+      enableInteractiveSelection: selectionEnabled,
+      selectionControls: selectionEnabled ? selectionControls : null,
+      contextMenuBuilder: selectionEnabled ? contextMenuBuilder : null,
+      // Input configuration
+      keyboardType: keyboardType,
+      inputFormatters: _buildInputFormatters(),
+      autofocus: false, // Handled externally
+      autocorrect: false,
+      enableSuggestions: false,
+      textCapitalization: textCapitalization,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
+      onEditingComplete: onEditingComplete,
+      onSelectionChanged: onSelectionChanged,
+      keyboardAppearance: keyboardAppearance ?? Theme.of(context).brightness,
+      scrollPadding: scrollPadding,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      clipBehavior: Clip.none,
+      // Autofill support
+      autofillHints: autofillHints,
     );
   }
 
