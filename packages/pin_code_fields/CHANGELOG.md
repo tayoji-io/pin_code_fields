@@ -1,3 +1,12 @@
+## 9.4.0+3
+
+ - **FIX**: the first tap on Paste did nothing on iOS. The 500ms clipboard timeout,
+   meant to keep the silent probe on focus from hanging, also capped the user-initiated
+   paste — nobody answers the "Allow Paste?" dialog that fast, so the read returned
+   null and only the second tap (with access already granted) appeared to work.
+ - **FIX**: point the paste menu at the long-pressed cell instead of the middle of
+   the row, the way a text field points at the caret.
+
 ## 9.4.0+2
 
  - **FIX**: anchor the paste toolbar to the PIN cells. It anchored to the selection

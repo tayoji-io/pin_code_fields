@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -413,6 +414,10 @@ class _PinInputState extends State<PinInput>
   final Set<int> _justEnteredIndices = {};
   final Set<int> _justRemovedIndices = {};
 
+  /// Where the last long press landed, used to point the paste menu at the
+  /// cell the user actually pressed.
+  Offset? _lastLongPressPosition;
+
   // Blink effect
   Timer? _blinkTimer;
   bool _isBlinking = false;
@@ -592,19 +597,24 @@ class _PinInputState extends State<PinInput>
   /// Maximum time to wait for a native clipboard response before giving up.
   /// On iOS the system clipboard prompt can stall the main thread; capping
   /// the wait prevents Sentry-reported App Hangs.
+  ///
+  /// Only the silent probe on focus gets this cap. A paste the user asked for
+  /// has to outwait iOS's "Allow Paste?" dialog, which nobody answers within
+  /// 500ms — capping that one makes the first tap on Paste do nothing at all,
+  /// and only the second tap (by then iOS has granted access) appears to work.
   static const _clipboardTimeout = Duration(milliseconds: 500);
 
-  /// Reads the clipboard with a timeout guard.
+  /// Reads the clipboard, optionally giving up after [timeout].
   ///
   /// Returns the plain-text content, or `null` if the read fails, times out,
   /// or yields empty data. Never throws.
-  Future<String?> _safeClipboardRead() async {
+  Future<String?> _safeClipboardRead({Duration? timeout}) async {
     try {
-      final clipboardData = await Clipboard.getData(Clipboard.kTextPlain)
-          .timeout(
-            _clipboardTimeout,
-            onTimeout: () => null,
-          );
+      var read = Clipboard.getData(Clipboard.kTextPlain);
+      if (timeout != null) {
+        read = read.timeout(timeout, onTimeout: () => null);
+      }
+      final clipboardData = await read;
       final text = clipboardData?.text;
       return (text != null && text.isNotEmpty) ? text : null;
     } catch (_) {
@@ -660,6 +670,10 @@ class _PinInputState extends State<PinInput>
   /// the invisible [InvisibleTextField], which is a one-line-tall strip pinned
   /// to the bottom of the stack — anchoring there drops the menu on top of the
   /// cells instead of above the field.
+  ///
+  /// Horizontally the menu points at the cell that was long-pressed, the way a
+  /// regular text field points at the caret; it falls back to the middle of the
+  /// field when the toolbar is opened some other way.
   TextSelectionToolbarAnchors _toolbarAnchors(
     EditableTextState editableTextState,
   ) {
@@ -668,10 +682,14 @@ class _PinInputState extends State<PinInput>
       return editableTextState.contextMenuAnchors;
     }
     final topLeft = box.localToGlobal(Offset.zero);
-    final centerX = topLeft.dx + box.size.width / 2;
+    final anchorX = clampDouble(
+      _lastLongPressPosition?.dx ?? topLeft.dx + box.size.width / 2,
+      topLeft.dx,
+      topLeft.dx + box.size.width,
+    );
     return TextSelectionToolbarAnchors(
-      primaryAnchor: Offset(centerX, topLeft.dy),
-      secondaryAnchor: Offset(centerX, topLeft.dy + box.size.height),
+      primaryAnchor: Offset(anchorX, topLeft.dy),
+      secondaryAnchor: Offset(anchorX, topLeft.dy + box.size.height),
     );
   }
 
@@ -695,7 +713,7 @@ class _PinInputState extends State<PinInput>
   Future<void> _checkClipboard() async {
     if (widget.onClipboardFound == null) return;
 
-    final text = await _safeClipboardRead();
+    final text = await _safeClipboardRead(timeout: _clipboardTimeout);
     if (text == null) return;
 
     final isValid = _validateClipboardContent(text);
@@ -1002,6 +1020,7 @@ class _PinGestureDetectorBuilder extends TextSelectionGestureDetectorBuilder {
 
   @override
   void onSingleLongTapStart(LongPressStartDetails details) {
+    _state._lastLongPressPosition = details.globalPosition;
     super.onSingleLongTapStart(details);
     _state.widget.onLongPress?.call();
   }

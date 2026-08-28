@@ -115,4 +115,66 @@ void main() {
     expect(longPresses, 1);
     expect(taps, 1);
   });
+
+  testWidgets('menu points at the pressed cell, not the middle of the row', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: MaterialPinField(length: 6, mainAxisSize: MainAxisSize.max),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    final field = tester.getRect(find.byType(MaterialPinField));
+    final firstCell = Offset(field.left + 20, field.center.dy);
+    await tester.longPressAt(firstCell);
+    await tester.pump(const Duration(seconds: 1));
+
+    final toolbar = tester.getRect(find.text('Paste'));
+    expect(toolbar.bottom, lessThanOrEqualTo(field.top));
+    expect((toolbar.center.dx - firstCell.dx).abs(), lessThan(60));
+    expect(toolbar.center.dx, lessThan(field.center.dx));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  testWidgets('a paste outwaits a slow clipboard permission prompt', (
+    tester,
+  ) async {
+    // Stands in for iOS's "Allow Paste?" dialog: nobody answers it in 500ms.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') {
+        await Future<void>.delayed(const Duration(seconds: 3));
+        return <String, dynamic>{'text': '123456'};
+      }
+      return null;
+    });
+
+    var pin = '';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: MaterialPinField(
+              length: 6,
+              keyboardType: TextInputType.number,
+              onChanged: (value) => pin = value,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.longPress(find.byType(MaterialPinField));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Paste'));
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(pin, '123456');
+  });
 }
