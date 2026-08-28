@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -392,7 +393,7 @@ class _PinInputState extends State<PinInput>
   static const _fallbackFocusDelay = Duration(milliseconds: 50);
 
   // Gesture handling
-  late TextSelectionGestureDetectorBuilder _gestureBuilder;
+  late _PinGestureDetectorBuilder _gestureBuilder;
 
   // Delegate properties
   @override
@@ -427,7 +428,7 @@ class _PinInputState extends State<PinInput>
     _initPinController();
     _textController.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
-    _gestureBuilder = TextSelectionGestureDetectorBuilder(delegate: this);
+    _gestureBuilder = _PinGestureDetectorBuilder(this);
     _handleAutoFocus();
   }
 
@@ -549,6 +550,13 @@ class _PinInputState extends State<PinInput>
     super.dispose();
   }
 
+  void _handleTap() {
+    if (widget.enabled && !_focusNode.hasFocus && !widget.readOnly) {
+      _requestFocusSafely();
+    }
+    widget.onTap?.call();
+  }
+
   void _requestFocusSafely() {
     if (mounted && _focusNode.context != null) {
       FocusScope.of(context).requestFocus(_focusNode);
@@ -636,13 +644,34 @@ class _PinInputState extends State<PinInput>
     EditableTextState editableTextState,
   ) {
     return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: editableTextState.contextMenuAnchors,
+      anchors: _toolbarAnchors(editableTextState),
       buttonItems: [
         ContextMenuButtonItem(
           type: ContextMenuButtonType.paste,
           onPressed: () => _handlePasteAction(editableTextState),
         ),
       ],
+    );
+  }
+
+  /// Anchors the toolbar to the PIN cells rather than to the editable.
+  ///
+  /// [EditableTextState.contextMenuAnchors] derives from the selection inside
+  /// the invisible [InvisibleTextField], which is a one-line-tall strip pinned
+  /// to the bottom of the stack — anchoring there drops the menu on top of the
+  /// cells instead of above the field.
+  TextSelectionToolbarAnchors _toolbarAnchors(
+    EditableTextState editableTextState,
+  ) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) {
+      return editableTextState.contextMenuAnchors;
+    }
+    final topLeft = box.localToGlobal(Offset.zero);
+    final centerX = topLeft.dx + box.size.width / 2;
+    return TextSelectionToolbarAnchors(
+      primaryAnchor: Offset(centerX, topLeft.dy),
+      secondaryAnchor: Offset(centerX, topLeft.dy + box.size.height),
     );
   }
 
@@ -863,57 +892,48 @@ class _PinInputState extends State<PinInput>
     Widget content = MouseRegion(
       cursor: widget.mouseCursor ??
           (widget.enabled ? SystemMouseCursors.text : SystemMouseCursors.basic),
-      child: GestureDetector(
-        onTap: () {
-          if (widget.enabled && !_focusNode.hasFocus && !widget.readOnly) {
-            _requestFocusSafely();
-          }
-          widget.onTap?.call();
-        },
-        onLongPress: widget.onLongPress,
-        child: _gestureBuilder.buildGestureDetector(
-          behavior: HitTestBehavior.translucent,
-          child: PinInputScope(
-            cells: cells,
-            obscureText: widget.obscureText,
-            obscuringCharacter: widget.obscuringCharacter,
-            hasFocus: _focusNode.hasFocus,
-            requestFocus: _requestFocusSafely,
-            child: Stack(
-              children: [
-                // User's custom UI
-                widget.builder(context, cells),
+      child: _gestureBuilder.buildGestureDetector(
+        behavior: HitTestBehavior.translucent,
+        child: PinInputScope(
+          cells: cells,
+          obscureText: widget.obscureText,
+          obscuringCharacter: widget.obscuringCharacter,
+          hasFocus: _focusNode.hasFocus,
+          requestFocus: _requestFocusSafely,
+          child: Stack(
+            children: [
+              // User's custom UI
+              widget.builder(context, cells),
 
-                // Invisible input layer - positioned at top so auto-scroll
-                // shows the full PIN field above the keyboard
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: InvisibleTextField(
-                    editableTextKey: editableTextKey,
-                    controller: _textController,
-                    focusNode: _focusNode,
-                    length: widget.length,
-                    readOnly: widget.readOnly,
-                    selectionEnabled: selectionEnabled,
-                    selectionControls: selectionControls,
-                    contextMenuBuilder: _resolveContextMenuBuilder(),
-                    keyboardType: widget.keyboardType,
-                    inputFormatters: widget.inputFormatters,
-                    textCapitalization: widget.textCapitalization,
-                    textInputAction: widget.textInputAction,
-                    onSubmitted: widget.onSubmitted,
-                    onEditingComplete: widget.onEditingComplete,
-                    onSelectionChanged: _handleSelectionChanged,
-                    keyboardAppearance: widget.keyboardAppearance,
-                    scrollPadding: widget.scrollPadding,
-                    autofillHints:
-                        widget.enableAutofill ? widget.autofillHints : null,
-                  ),
+              // Invisible input layer - positioned at top so auto-scroll
+              // shows the full PIN field above the keyboard
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: InvisibleTextField(
+                  editableTextKey: editableTextKey,
+                  controller: _textController,
+                  focusNode: _focusNode,
+                  length: widget.length,
+                  readOnly: widget.readOnly,
+                  selectionEnabled: selectionEnabled,
+                  selectionControls: selectionControls,
+                  contextMenuBuilder: _resolveContextMenuBuilder(),
+                  keyboardType: widget.keyboardType,
+                  inputFormatters: widget.inputFormatters,
+                  textCapitalization: widget.textCapitalization,
+                  textInputAction: widget.textInputAction,
+                  onSubmitted: widget.onSubmitted,
+                  onEditingComplete: widget.onEditingComplete,
+                  onSelectionChanged: _handleSelectionChanged,
+                  keyboardAppearance: widget.keyboardAppearance,
+                  scrollPadding: widget.scrollPadding,
+                  autofillHints:
+                      widget.enableAutofill ? widget.autofillHints : null,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -960,5 +980,29 @@ class _PinInputState extends State<PinInput>
       obscured: widget.obscureText,
       child: content,
     );
+  }
+}
+
+/// Forwards [PinInput.onTap] / [PinInput.onLongPress] from the selection
+/// gesture detector.
+///
+/// They used to hang off a plain [GestureDetector] wrapped around this one,
+/// which never won the gesture arena against the detector below it, so neither
+/// callback ever fired.
+class _PinGestureDetectorBuilder extends TextSelectionGestureDetectorBuilder {
+  _PinGestureDetectorBuilder(this._state) : super(delegate: _state);
+
+  final _PinInputState _state;
+
+  @override
+  void onSingleTapUp(TapDragUpDetails details) {
+    super.onSingleTapUp(details);
+    _state._handleTap();
+  }
+
+  @override
+  void onSingleLongTapStart(LongPressStartDetails details) {
+    super.onSingleLongTapStart(details);
+    _state.widget.onLongPress?.call();
   }
 }

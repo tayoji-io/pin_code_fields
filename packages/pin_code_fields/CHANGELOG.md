@@ -1,3 +1,12 @@
+## 9.4.0+2
+
+ - **FIX**: anchor the paste toolbar to the PIN cells. It anchored to the selection
+   inside the invisible `EditableText`, a one-line strip pinned to the bottom of the
+   stack, so the menu landed on top of the cells instead of above the field.
+ - **FIX**: `onTap` / `onLongPress` never fired. They hung off a plain `GestureDetector`
+   wrapped around the selection gesture detector, which always lost the gesture arena;
+   they are now forwarded from the selection detector itself.
+
 ## 9.4.0+1
 
  - **FIX**: paste toolbar was invisible and untappable, silently disabling `enablePaste`.

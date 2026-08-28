@@ -64,4 +64,54 @@ void main() {
     expect(await longPressAndPaste(tester, enablePaste: false), '');
     expect(find.text('Paste'), findsNothing);
   });
+
+  testWidgets('paste toolbar sits above the cells, not on them', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(child: MaterialPinField(length: 6)),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.longPress(find.byType(MaterialPinField));
+    await tester.pump(const Duration(seconds: 1));
+
+    final field = tester.getRect(find.byType(MaterialPinField));
+    final toolbar = tester.getRect(find.text('Paste'));
+    expect(toolbar.bottom, lessThanOrEqualTo(field.top));
+    expect(toolbar.center.dx, moreOrLessEquals(field.center.dx, epsilon: 1));
+  });
+
+  testWidgets('onTap and onLongPress fire', (tester) async {
+    var taps = 0;
+    var longPresses = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: MaterialPinField(
+              length: 6,
+              onTap: () => taps++,
+              onLongPress: () => longPresses++,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.tap(find.byType(MaterialPinField));
+    await tester.pump(const Duration(seconds: 1));
+    expect(taps, 1);
+    expect(longPresses, 0);
+
+    await tester.longPress(find.byType(MaterialPinField));
+    await tester.pump(const Duration(seconds: 1));
+    expect(longPresses, 1);
+    expect(taps, 1);
+  });
 }
